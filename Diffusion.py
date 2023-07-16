@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import os
+import copy
 import numpy as np
 import torch
 import torchvision
@@ -27,30 +28,30 @@ class Diffusion:
     2 - Function for noising images
     3 - Sampling images
     '''
-    
+
     def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=64, device="cuda"):
         self.noise_steps = noise_steps
         self.beta_start = beta_start
         self.beta_end = beta_end
         self.img_size = img_size
         self.device = device
-        
+
         self.beta = self.prepare_noise_schedule().to(device)
         self.alpha = 1. - self.beta
         self.alpha_hat = torch.cumprod(self.alpha, dim=0)
-        
+
     def prepare_noise_schedule(self):
         return torch.linspace(self.beta_start, self.beta_end, self.noise_steps)
-    
+
     def noise_images(self, x, t):
         sqrt_alpha_hat = torch.sqrt(self.alpha_hat[t])[:, None, None, None]
         sqrt_one_minus_alpha_hat = torch.sqrt(1.0 - self.alpha_hat[t])[:, None, None, None]
         eps = torch.randn_like(x)
         return sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * eps, eps
-    
+
     def sample_timesteps(self, n):
         return torch.randint(low=1, high=self.noise_steps, size=(n,))
-    
+
     def sample(self, model, n):
         logging.info(f"Sampling {n} new images ....")
         model.eval()
@@ -67,7 +68,7 @@ class Diffusion:
                 else:
                     noise = torch.zeros_like(x)
                 x = 1 / torch.sqrt(alpha) * (x - ((1 - alpha)/(torch.sqrt(1 - alpha_hat))) * predicted_noise) + torch.sqrt(beta) * noise
-        
+
         model.train()
         x = (x.clamp(-1, 1) + 1) / 2
         x = (x * 255).type(torch.uint8)
@@ -87,7 +88,7 @@ class DoubleConv(nn.Module):
                             nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
                             nn.GroupNorm(1, out_channels),
                             )
-        
+
     def forward(self, x):
         if self.residual:
             return F.gelu(x + self.double_conv(x))
@@ -103,12 +104,12 @@ class Down(nn.Module):
                             DoubleConv(in_channels, in_channels, residual=True),
                             DoubleConv(in_channels, out_channels),
                             )
-        
+
         self.emb_layer = nn.Sequential(
                             nn.SiLU(),
                             nn.Linear(emb_dim, out_channels),
                             )
-        
+
     def forward(self, x, t):
         x = self.maxpool_conv(x)
         emb = self.emb_layer(t)[:, :, None, None].repeat(1, 1, x.shape[-2], x.shape[-1])
@@ -127,7 +128,7 @@ class Up(nn.Module):
                             nn.SiLU(),
                             nn.Linear(emb_dim, out_channels),
                             )
-        
+
     def forward(self, x, skip_x, t):
         x = self.up(x)
         x = torch.cat([skip_x, x], dim=1)
@@ -149,7 +150,7 @@ class SelfAttention(nn.Module):
                         nn.GELU(),
                         nn.Linear(channels, channels),
                         )
-        
+
     def forward(self, x):
         x = x.view(-1, self.channels, self.size * self.size).swapaxes(1, 2)
         x_ln = self.ln(x)
@@ -171,11 +172,11 @@ class UNet(nn.Module):
         self.sa2 = SelfAttention(channels=256, size=16)
         self.down3 = Down(in_channels=256, out_channels=256)
         self.sa3 = SelfAttention(channels=256, size=8)
-        
+
         self.bot1 = DoubleConv(in_channels=256, out_channels=512)
         self.bot2 = DoubleConv(in_channels=512, out_channels=512)
         self.bot3 = DoubleConv(in_channels=512, out_channels=256)
-        
+
         self.up1 = Up(in_channels=512, out_channels=128)
         self.sa4 = SelfAttention(channels=128, size=16)
         self.up2 = Up(in_channels=256, out_channels=64)
@@ -183,37 +184,37 @@ class UNet(nn.Module):
         self.up3 = Up(in_channels=128, out_channels=64)
         self.sa6 = SelfAttention(channels=64, size=64)
         self.outc = nn.Conv2d(64, c_out, kernel_size=1)
-        
+
     def pos_encoding(self, t, channels):
         inv_freq = 1.0 / (10000 ** (torch.arange(0, channels, 2, device=self.device).float() / channels))
         pos_enc_a = torch.sin(t.repeat(1, channels // 2) * inv_freq)
         pos_enc_b = torch.cos(t.repeat(1, channels // 2) * inv_freq)
         pos_enc = torch.cat([pos_enc_a ,pos_enc_b], dim=-1)
         return pos_enc
-    
+
     def forward(self, x, t):
         t = t.unsqueeze(-1).type(torch.float)
         t = self.pos_encoding(t, self.time_dim)
-        
-        x1 = self.inc(x)
-        x2 = self.down1(x1, t)
-        x2 = self.sa1(x2)
-        x3 = self.down2(x2, t)
-        x3 = self.sa2(x3)
-        x4 = self.down3(x3, t)
-        x4 = self.sa3(x4)
-        
-        x4 = self.bot1(x4)
-        x4 = self.bot2(x4)
-        x4 = self.bot3(x4)
-        
-        x = self.up1(x4, x3, t)
-        x = self.sa4(x)
-        x = self.up2(x, x2, t)
-        x = self.sa5(x)
-        x = self.up3(x, x1, t)
-        x = self.sa6(x)
-        output = self.outc(x)
+
+        x1 = self.inc(x)        #Input: h,w,3 | Output: h, w, 64
+        x2 = self.down1(x1, t)  #Input: h,w,64 + t | Output: h/2, w/2, 128
+        x2 = self.sa1(x2)       #Input: h/2, w/2, 128 | Output: h/2, w/2, 128
+        x3 = self.down2(x2, t)  #Input: h/2, w/2, 128 + t | Output: h/4, w/4, 256
+        x3 = self.sa2(x3)       #Input: h/4, w/4, 256 | Output: h/4, w/4, 256
+        x4 = self.down3(x3, t)  #Input: h/4, w/4, 256 + t | Output: h/8, w/8, 256
+        x4 = self.sa3(x4)       #Input: h/8, w/8, 256 | Output: h/8, w/8, 256
+
+        x4 = self.bot1(x4)      #Input: h/8, w/8, 256 | Output: h/8, w/8, 512
+        x4 = self.bot2(x4)      #Input: h/8, w/8, 512 | Output: h/8, w/8, 512
+        x4 = self.bot3(x4)      #Input: h/8, w/8, 512 | Output: h/8, w/8, 256
+
+        x = self.up1(x4, x3, t) #Input: h/8, w/8, 256 + h/4, w/4, 256 + t | Output: h/4, w/4, 128
+        x = self.sa4(x)         #Input: h/4, w/4, 128 | Output: h/4, w/4, 128
+        x = self.up2(x, x2, t)  #Input: h/4, w/4, 128 + h/2, w/2, 128 + t | Output: h/2, w/2, 64
+        x = self.sa5(x)         #Input: h/2, w/2, 64 | Output: h/2, w/2, 64
+        x = self.up3(x, x1, t)  #Input: h/2, w/2, 64 + h, w, 64 + t | Output: h, w, 64
+        x = self.sa6(x)         #Input: h, w, 64 | Output: h, w, 64
+        output = self.outc(x)   #Input: h, w, 64 | Output: h, w, 3
         return output
 
 
@@ -261,7 +262,7 @@ def train(args):
     diffusion = Diffusion(img_size=args.image_size, device=device)
     logger = SummaryWriter(os.path.join("runs", args.run_name))
     l = len(dataloader)
-    
+
     for epoch in range(args.epochs):
         logging.info(f"Starting epoch {epoch}:")
         pbar = tqdm(dataloader)
@@ -271,14 +272,14 @@ def train(args):
             x_t, noise = diffusion.noise_images(images, t)
             predicted_noise = model(x_t, t)
             loss = mse(noise, predicted_noise)
-            
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
+
             pbar.set_postfix(MSE=loss.item())
             logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
-        
+
         sampled_images = diffusion.sample(model, n=images.shape[0])
         save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
         torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
@@ -314,11 +315,11 @@ class UNet_conditional(nn.Module):
         self.sa2 = SelfAttention(channels=256, size=16)
         self.down3 = Down(in_channels=256, out_channels=256)
         self.sa3 = SelfAttention(channels=256, size=8)
-        
+
         self.bot1 = DoubleConv(in_channels=256, out_channels=512)
         self.bot2 = DoubleConv(in_channels=512, out_channels=512)
         self.bot3 = DoubleConv(in_channels=512, out_channels=256)
-        
+
         self.up1 = Up(in_channels=512, out_channels=128)
         self.sa4 = SelfAttention(channels=128, size=16)
         self.up2 = Up(in_channels=256, out_channels=64)
@@ -329,18 +330,18 @@ class UNet_conditional(nn.Module):
 
         if num_classes is not None:
             self.label_emb = nn.Embedding(num_classes, time_dim)
-        
+
     def pos_encoding(self, t, channels):
         inv_freq = 1.0 / (10000 ** (torch.arange(0, channels, 2, device=self.device).float() / channels))
         pos_enc_a = torch.sin(t.repeat(1, channels // 2) * inv_freq)
         pos_enc_b = torch.cos(t.repeat(1, channels // 2) * inv_freq)
         pos_enc = torch.cat([pos_enc_a ,pos_enc_b], dim=-1)
         return pos_enc
-    
+
     def forward(self, x, t, y):
         t = t.unsqueeze(-1).type(torch.float)
         t = self.pos_encoding(t, self.time_dim)
-        
+
         if y is not None:
             t += self.label_emb(y)
 
@@ -351,11 +352,11 @@ class UNet_conditional(nn.Module):
         x3 = self.sa2(x3)
         x4 = self.down3(x3, t)
         x4 = self.sa3(x4)
-        
+
         x4 = self.bot1(x4)
         x4 = self.bot2(x4)
         x4 = self.bot3(x4)
-        
+
         x = self.up1(x4, x3, t)
         x = self.sa4(x)
         x = self.up2(x, x2, t)
@@ -376,7 +377,7 @@ def train(args):
     diffusion = Diffusion(img_size=args.image_size, device=device)
     logger = SummaryWriter(os.path.join("runs", args.run_name))
     l = len(dataloader)
-    
+
     for epoch in range(args.epochs):
         logging.info(f"Starting epoch {epoch}:")
         pbar = tqdm(dataloader)
@@ -389,14 +390,14 @@ def train(args):
                 labels = None
             predicted_noise = model(x_t, t, labels)
             loss = mse(noise, predicted_noise)
-            
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
+
             pbar.set_postfix(MSE=loss.item())
             logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
-        
+
         sampled_images = diffusion.sample(model, n=images.shape[0])
         save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
         torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
@@ -437,7 +438,7 @@ def sample(self, model, n, labels, cfg_scale=3):
                 else:
                     noise = torch.zeros_like(x)
                 x = 1 / torch.sqrt(alpha) * (x - ((1 - alpha)/(torch.sqrt(1 - alpha_hat))) * predicted_noise) + torch.sqrt(beta) * noise
-        
+
         model.train()
         x = (x.clamp(-1, 1) + 1) / 2
         x = (x * 255).type(torch.uint8)
@@ -462,7 +463,7 @@ class EMA:
             self.reset_parameters(ema_model, model)
             self.step += 1
             return
-        
+
         self.update_model_average(ema_model, model)
         self.step += 1
 
@@ -482,7 +483,7 @@ def train(args):
     l = len(dataloader)
     ema = EMA(beta=0.995)
     ema_model = copy.deepcopy(model).eval().requires_grad_(False)
-    
+
     for epoch in range(args.epochs):
         logging.info(f"Starting epoch {epoch}:")
         pbar = tqdm(dataloader)
@@ -495,15 +496,15 @@ def train(args):
                 labels = None
             predicted_noise = model(x_t, t, labels)
             loss = mse(noise, predicted_noise)
-            
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             ema.step_ema(ema_model, model)
-            
+
             pbar.set_postfix(MSE=loss.item())
             logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
-        
+
         if epoch % 10 == 0:
             labels = torch.arange(10).long().to(device)
             sampled_images = diffusion.sample(model, n=images.shape[0], labels=labels)
