@@ -326,7 +326,7 @@ def launch():
     args.epochs = 500
     args.batch_size = 1
     args.image_size = 112
-    args.dataset_path = r"/home/barc/Desktop/subir/datasets/MS1MV2"
+    args.dataset_path = r"/home/barc/Desktop/subir/datasets/MS1MV2-10K"
     args.device = "cuda"
     args.lr = 3e-4
     train(args)
