@@ -4,36 +4,42 @@ import os
 import numpy as np
 import scipy.io
 import cv2
-import chainer
-from chainer import iterators
-from chainercv.links import FasterRCNNVGG16
-from chainercv import utils
+#import chainer
+#from chainer import iterators
+#from chainercv.links import FasterRCNNVGG16
+#from chainercv import utils
 import argparse
 
 # dataset paths
 #WIDER_VAL_DIR = 'D:/Face/Wider_Face/WIDER_train/WIDER_train'
-WIDER_VAL_DIR = 'D:/Face/Wider_Face/WIDER_val'
+#WIDER_VAL_DIR = 'D:/Face/Wider_Face/WIDER_val'
+WIDER_VAL_DIR = '/home/barc/Desktop/subir/datasets/Widerface/WIDER_train/WIDER_train'
+#WIDER_VAL_DIR = '/home/barc/Desktop/subir/datasets/Widerface/WIDER_val/WIDER_val'
+
 #WIDER_VAL_ANNOTATION_MAT = 'D:/Face/Wider_Face/wider_face_split/wider_face_split/wider_face_train.mat'
-WIDER_VAL_ANNOTATION_MAT = 'D:/Face/Wider_Face/wider_face_split/wider_face_split/wider_face_val.mat'
+#WIDER_VAL_ANNOTATION_MAT = 'D:/Face/Wider_Face/wider_face_split/wider_face_split/wider_face_val.mat'
+WIDER_VAL_ANNOTATION_MAT = '/home/barc/Desktop/subir/datasets/Widerface/wider_face_split/wider_face_split/wider_face_train.mat'
+#WIDER_VAL_ANNOTATION_MAT = '/home/barc/Desktop/subir/datasets/Widerface/wider_face_split/wider_face_split/wider_face_val.mat'
+
 # trained model
-MODELFILE = 'D:/Face/Wider_Face/trained_model/snapshot_model_20180404.npz'
+#MODELFILE = '/home/barc/Desktop/subir/datasets/Widerface/trained_model/snapshot_model_20180404.npz'
 
 mat = scipy.io.loadmat(WIDER_VAL_ANNOTATION_MAT)
 
 #dict_keys(['pose_label_list', 'event_list', 'file_list', '__header__', '__version__', 'invalid_label_list', 'illumination_label_list', '__globals__', 'occlusion_label_list', 'face_bbx_list', 'blur_label_list', 'expression_label_list'])
 
-model = FasterRCNNVGG16(
-    n_fg_class=1,
-    pretrained_model=MODELFILE)
+#model = FasterRCNNVGG16(
+#    n_fg_class=1,
+#    pretrained_model=MODELFILE)
 
 parser = argparse.ArgumentParser(
         description='view detection test on validation dataset')
 parser.add_argument('--gpu', '-g', type=int, default=-1)
 args = parser.parse_args()
 
-if args.gpu >= 0:
-    chainer.cuda.get_device(args.gpu).use()
-    model.to_gpu(args.gpu)
+#if args.gpu >= 0:
+#    chainer.cuda.get_device(args.gpu).use()
+#    model.to_gpu(args.gpu)
 
 c = 0
 
@@ -76,7 +82,7 @@ for i in range(len(mat['event_list'])):
                 #cv2.imshow('crop', cropped_image)
                 #key = cv2.waitKey()
 #                crop_name = "cropped_images_train/img_" + str(c) + ".png"
-                crop_name = "cropped_images_val/img_" + str(c) + ".png"
+                crop_name = "/home/barc/Desktop/subir/datasets/Widerface/cropped_images_train/img_" + str(c) + ".png" #cropped_images_val
                 cv2.imwrite(crop_name, cropped_image)
             
 #        imgpred = utils.read_image(filepath, color=True)
