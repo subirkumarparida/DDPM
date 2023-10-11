@@ -12,9 +12,9 @@ def conv3x3(in_planes, out_planes, stride=1):
                      padding=1, bias=False)
 
 
-class BasicBlock(nn.Module):
+class BasicBlock_Gen(nn.Module):
     def __init__(self, inplanes, planes, stride=1, downsample=False, upsample=False, nobn=False):
-        super(BasicBlock, self).__init__()
+        super(BasicBlock_Gen, self).__init__()
         self.upsample = upsample
         self.downsample = downsample
         self.nobn = nobn
@@ -164,7 +164,7 @@ class GEN_DEEP(nn.Module):
 
             for j in range(num_blocks_level):
                 # if curr_inp_resu[j]==3:
-                self.layers_set[ru].append(BasicBlock(curr_inp_resu[j], nunits))
+                self.layers_set[ru].append(BasicBlock_Gen(curr_inp_resu[j], nunits))
                 # else:
                 # layers.append(MyBlock(curr_inp_resu[j], nunits))
 
@@ -227,14 +227,14 @@ class High2Low(nn.Module):
         in_feat = blocks[0]
         for i in range(8):  # downsample layers
             b_down = not i % 2
-            downs.append(BasicBlock(in_feat, blocks[i], downsample=b_down))
+            downs.append(BasicBlock_Gen(in_feat, blocks[i], downsample=b_down))
             in_feat = blocks[i]
 
         ups = []
         for i in range(2):
             ups.append(nn.PixelShuffle(2))
-            ups.append(BasicBlock(blocks[8 + i * 2], blocks[8 + i * 2]))
-            ups.append(BasicBlock(blocks[9 + i * 2], blocks[9 + i * 2]))
+            ups.append(BasicBlock_Gen(blocks[8 + i * 2], blocks[8 + i * 2]))
+            ups.append(BasicBlock_Gen(blocks[9 + i * 2], blocks[9 + i * 2]))
 
         self.down_layers = nn.Sequential(*downs)
         self.up_layers = nn.Sequential(*ups)
@@ -256,6 +256,7 @@ def discriminator_test():
     X = np.random.randn(2, 3, in_size, in_size).astype(np.float32)
     X = torch.from_numpy(X).cuda()
     Y = net(X)
+    print("----discriminator_test()----")
     print(Y.shape)
 
 
@@ -266,6 +267,7 @@ def high2low_test():
     Z = torch.from_numpy(Z).cuda()
     X = torch.from_numpy(X).cuda()
     Y = net(X, Z)
+    print("----high2low_test()----")
     print(Y.shape)
     
     Xim = X.cpu().numpy().squeeze().transpose(1, 2, 0)
@@ -282,6 +284,7 @@ def gen_deep_test():
     X = np.random.randn(1, 3, 16, 16).astype(np.float32) # B, C, H, W
     X = torch.from_numpy(X).cuda()
     Y = net(X)
+    print("----gen_deep_test()----")
     print(Y.shape)
 
     Xim = X.cpu().numpy().squeeze().transpose(1,2,0)

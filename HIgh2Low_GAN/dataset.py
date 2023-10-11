@@ -1,7 +1,7 @@
 import cv2
 import os,time,sys
-from glob import glob, iglob
 import numpy as np
+from glob import glob, iglob
 
 import PIL
 from PIL import Image
