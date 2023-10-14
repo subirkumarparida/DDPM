@@ -45,7 +45,7 @@ if __name__ == "__main__":
     optim_G_l2h = optim.Adam(G_l2h.parameters(), lr=learn_rate, betas=(0.0, 0.9))
 
     data = faces_data(High_Data, Low_Data)
-    loader = DataLoader(dataset=data, batch_size=32, shuffle=True)
+    loader = DataLoader(dataset=data, batch_size=5, shuffle=True)
     test_loader = get_loader("widerfacetest", bs=1)
     num_test = 10
     test_save = "intermid_results"

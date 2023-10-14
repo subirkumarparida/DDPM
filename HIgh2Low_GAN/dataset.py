@@ -12,8 +12,8 @@ from torchvision import transforms, utils
 from torch.utils.data import Dataset, DataLoader
 
 
-High_Data = ["Dataset/HIGH/celea_60000_SFD", "Dataset/HIGH/SRtrainset_2", "Dataset/HIGH/vggface2/vggcrop_test_lp10", "Dataset/HIGH/vggface2/vggcrop_train_lp10"]
-Low_Data = ["Dataset/LOW/wider_lnew"]
+High_Data = ["D:/Face/Small-CelebA/images"]
+Low_Data = ["D:/Face/Wider_Face/cropped_images/cropped_images_train"]
 
 
 class faces_super(Dataset):
@@ -23,8 +23,8 @@ class faces_super(Dataset):
         self.img_list = []
         dataset = datasets
         if dataset == 'widerfacetest':
-            img_path = './testset/'
-            list_name = (glob(os.path.join(img_path, "*.jpg")))
+            img_path = 'D:/Face/Wider_Face/cropped_images/cropped_images_val/'
+            list_name = (glob(os.path.join(img_path, "*.png")))
             list_name.sort()
             for filename in list_name:#jpg
                 self.img_list.append(filename)
@@ -65,12 +65,15 @@ class faces_data(Dataset):
         ])
 
     def __len__(self):
+        #print(len(self.lr_imgs))
         return len(self.hr_imgs)
 
     def __getitem__(self, index):
         data = {}
         hr = cv2.imread(self.hr_imgs[index])
+        hr = cv2.resize(hr, (64, 64), interpolation = cv2.INTER_CUBIC)
         lr = cv2.imread(self.lr_imgs[self.lr_shuf[self.lr_idx]])
+        lr = cv2.resize(lr, (16, 16), interpolation = cv2.INTER_CUBIC)
         self.lr_idx += 1
         if self.lr_idx >= self.lr_len:
             self.lr_idx = 0
@@ -103,10 +106,10 @@ if __name__ == "__main__":
             lr = (lr - lr.min()) / (lr.max() - lr.min())
             hr = (hr - hr.min()) / (hr.max() - hr.min())
             down = (down - down.min()) / (down.max() - down.min())
-#            cv2.imshow("lr-{}".format(b), lr)
-#            cv2.imshow("hr-{}".format(b), hr)
-#            cv2.imshow("down-{}".format(b), down)
-#            cv2.waitKey()
-#            cv2.destroyAllWindows()
+            cv2.imshow("lr-{}".format(b), lr)
+            cv2.imshow("hr-{}".format(b), hr)
+            cv2.imshow("down-{}".format(b), down)
+            cv2.waitKey()
+            cv2.destroyAllWindows()
 
     print("finished.")
