@@ -12,8 +12,9 @@ from torchvision import transforms, utils
 from torch.utils.data import Dataset, DataLoader
 
 
-High_Data = ["D:/Face/Small-CelebA/images"]
-Low_Data = ["D:/Face/Wider_Face/cropped_images/cropped_images_train"]
+High_Data = ["/home/barc/Desktop/subir/datasets/MS1MV2-4K/data"] #"D:/Face/Small-CelebA/images"]
+Low_Data = ["/home/barc/Desktop/subir/datasets/Widerface/cropped_faces/cropped_images_train"] #"D:/Face/Wider_Face/cropped_images/cropped_images_train"]
+
 
 
 class faces_super(Dataset):
@@ -23,7 +24,7 @@ class faces_super(Dataset):
         self.img_list = []
         dataset = datasets
         if dataset == 'widerfacetest':
-            img_path = 'D:/Face/Wider_Face/cropped_images/cropped_images_val/'
+            img_path = '/home/barc/Desktop/subir/datasets/Widerface/cropped_faces/cropped_images_val' #'D:/Face/Wider_Face/cropped_images/cropped_images_val/'
             list_name = (glob(os.path.join(img_path, "*.png")))
             list_name.sort()
             for filename in list_name:#jpg
@@ -90,7 +91,7 @@ class faces_data(Dataset):
         return torch.randn(n, 1, 64, dtype=torch.float32)
 
 if __name__ == "__main__":
-    test_loader = get_loader("widerfacetest", bs=2)
+    test_loader = get_loader("widerfacetest", bs=1)
     for i, sample in enumerate(test_loader):
         if i >= 3: 
             break

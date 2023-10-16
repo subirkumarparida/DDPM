@@ -16,7 +16,20 @@ from model import High2Low, Discriminator, GEN_DEEP
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--gpu", action="store", dest="gpu", help="separate numbers with commas, eg. 3,4,5", required=True)
 
+
+def get_default_device():
+    """Pick GPU if available, else CPU"""
+    if torch.cuda.is_available():
+        return torch.device('cuda')
+    else:
+        return torch.device('cpu')
+        
+which_device = get_default_device()
+print(which_device)
+
+  
 if __name__ == "__main__":
+    device = "cuda"
     args = parser.parse_args()
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     gpus = args.gpu.split(",")
@@ -33,10 +46,10 @@ if __name__ == "__main__":
     learn_rate = 1e-4
     alpha, beta = 1, 0.05
 
-    G_h2l = High2Low().cuda()
-    D_h2l = Discriminator(16).cuda()
-    G_l2h = GEN_DEEP().cuda()
-    D_l2h = Discriminator(64).cuda()
+    G_h2l = High2Low().to(device)
+    D_h2l = Discriminator(16).to(device)
+    G_l2h = GEN_DEEP().to(device)
+    D_l2h = Discriminator(64).to(device)
     mse = nn.MSELoss()
 
     optim_D_h2l = optim.Adam(filter(lambda p: p.requires_grad, D_h2l.parameters()), lr=learn_rate, betas=(0.0, 0.9))
@@ -45,7 +58,7 @@ if __name__ == "__main__":
     optim_G_l2h = optim.Adam(G_l2h.parameters(), lr=learn_rate, betas=(0.0, 0.9))
 
     data = faces_data(High_Data, Low_Data)
-    loader = DataLoader(dataset=data, batch_size=5, shuffle=True)
+    loader = DataLoader(dataset=data, batch_size=100, shuffle=True)
     test_loader = get_loader("widerfacetest", bs=1)
     num_test = 10
     test_save = "intermid_results"
@@ -61,11 +74,11 @@ if __name__ == "__main__":
             optim_G_h2l.zero_grad()
             optim_G_l2h.zero_grad()
 
-            zs = batch["z"].cuda()
-            lrs = batch["lr"].cuda()
-            hrs = batch["hr"].cuda()
-            downs = batch["hr_down"].cuda()
-
+            zs = batch["z"].to(device)
+            lrs = batch["lr"].to(device)
+            hrs = batch["hr"].to(device)
+            downs = batch["hr_down"].to(device)
+            
             lr_gen = G_h2l(hrs, zs)
             lr_gen_detach = lr_gen.detach()
             hr_gen = G_l2h(lr_gen_detach)
@@ -109,7 +122,7 @@ if __name__ == "__main__":
             if i >= num_test: 
                 break
             low_temp = sample["img16"].numpy()
-            low = torch.from_numpy(np.ascontiguousarray(low_temp[:, ::-1, :, :])).cuda()
+            low = torch.from_numpy(np.ascontiguousarray(low_temp[:, ::-1, :, :])).to(device)
             with torch.no_grad():
                 hign_gen = G_l2h(low)
             np_low = low.cpu().numpy().transpose(0, 2, 3, 1).squeeze(0)
@@ -120,6 +133,7 @@ if __name__ == "__main__":
             np_gen = (np_gen * 255).astype(np.uint8)
             cv2.imwrite("{}/imgs/{}_{}_lr.png".format(test_save, ep, i+1), np_low)
             cv2.imwrite("{}/imgs/{}_{}_sr.png".format(test_save, ep, i+1), np_gen)
+        
         save_file = "{}/models/model_epoch_{:03d}.pth".format(test_save, ep)
         torch.save({"G_h2l": G_h2l.state_dict(), "D_h2l": D_h2l.state_dict(),
                     "G_l2h": G_l2h.state_dict(), "D_l2h": D_l2h.state_dict()}, save_file)
