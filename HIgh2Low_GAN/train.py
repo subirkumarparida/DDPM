@@ -42,7 +42,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    max_epoch = 50
+    max_epoch = 150
     learn_rate = 1e-4
     alpha, beta = 1, 0.05
 
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     optim_G_l2h = optim.Adam(G_l2h.parameters(), lr=learn_rate, betas=(0.0, 0.9))
 
     data = faces_data(High_Data, Low_Data)
-    loader = DataLoader(dataset=data, batch_size=100, shuffle=True)
+    loader = DataLoader(dataset=data, batch_size=150, shuffle=True)
     test_loader = get_loader("widerfacetest", bs=1)
     num_test = 10
     test_save = "intermid_results"
@@ -109,7 +109,7 @@ if __name__ == "__main__":
             loss_G_l2h.backward()
             optim_G_l2h.step()
 
-            print(" {}({}) D_h2l: {:.3f}, D_l2h: {:.3f}, G_h2l: {:.3f}, G_l2h: {:.3f} \r".format(i+1, ep, loss_D_h2l.item(), loss_D_l2h.item(), loss_G_h2l.item(), loss_G_l2h.item()), end=" ")
+            print(" {}/{} D_h2l: {:.3f}, D_l2h: {:.3f}, G_h2l: {:.3f}, G_l2h: {:.3f} \r".format(ep, i+1, loss_D_h2l.item(), loss_D_l2h.item(), loss_G_h2l.item(), loss_G_l2h.item()), end=" ")
         
         print("\n Testing and saving...")
         

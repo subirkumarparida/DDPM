@@ -12,7 +12,7 @@ from torchvision import transforms, utils
 from torch.utils.data import Dataset, DataLoader
 
 
-High_Data = ["/home/barc/Desktop/subir/datasets/MS1MV2-4K/data"] #"D:/Face/Small-CelebA/images"]
+High_Data = ["/home/barc/Desktop/subir/datasets/MS1MV2-50K/data"] #"D:/Face/Small-CelebA/images"]
 Low_Data = ["/home/barc/Desktop/subir/datasets/Widerface/cropped_faces/cropped_images_train"] #"D:/Face/Wider_Face/cropped_images/cropped_images_train"]
 
 
