@@ -13,13 +13,13 @@ import argparse
 # dataset paths
 #WIDER_VAL_DIR = 'D:/Face/Wider_Face/WIDER_train/WIDER_train'
 #WIDER_VAL_DIR = 'D:/Face/Wider_Face/WIDER_val'
-WIDER_VAL_DIR = '/home/barc/Desktop/subir/datasets/Widerface/WIDER_train/WIDER_train'
-#WIDER_VAL_DIR = '/home/barc/Desktop/subir/datasets/Widerface/WIDER_val/WIDER_val'
+#WIDER_VAL_DIR = '/home/barc/Desktop/subir/datasets/Widerface/WIDER_train/WIDER_train'
+WIDER_VAL_DIR = '/home/barc/Desktop/subir/datasets/Widerface/WIDER_val/WIDER_val'
 
 #WIDER_VAL_ANNOTATION_MAT = 'D:/Face/Wider_Face/wider_face_split/wider_face_split/wider_face_train.mat'
 #WIDER_VAL_ANNOTATION_MAT = 'D:/Face/Wider_Face/wider_face_split/wider_face_split/wider_face_val.mat'
-WIDER_VAL_ANNOTATION_MAT = '/home/barc/Desktop/subir/datasets/Widerface/wider_face_split/wider_face_split/wider_face_train.mat'
-#WIDER_VAL_ANNOTATION_MAT = '/home/barc/Desktop/subir/datasets/Widerface/wider_face_split/wider_face_split/wider_face_val.mat'
+#WIDER_VAL_ANNOTATION_MAT = '/home/barc/Desktop/subir/datasets/Widerface/wider_face_split/wider_face_split/wider_face_train.mat'
+WIDER_VAL_ANNOTATION_MAT = '/home/barc/Desktop/subir/datasets/Widerface/wider_face_split/wider_face_split/wider_face_val.mat'
 
 # trained model
 #MODELFILE = '/home/barc/Desktop/subir/datasets/Widerface/trained_model/snapshot_model_20180404.npz'
@@ -42,15 +42,17 @@ args = parser.parse_args()
 #    model.to_gpu(args.gpu)
 
 c = 0
+f = 0
+b = 0
 
 for i in range(len(mat['event_list'])):
     event = mat['event_list'][i,0][0]
     for j in range(len(mat['file_list'][i,0])):
+        f += 1
         file = mat['file_list'][i,0][j,0][0]
         filename = "{}.jpg".format(file)
-        c += 1
         filepath = os.path.join(WIDER_VAL_DIR, 'images', event, filename)
-        print(filepath)
+        #print(filepath)
         
         # bounding boxes and labels of the picture file
         bboxs = mat['face_bbx_list'][i,0][j,0]
@@ -69,21 +71,27 @@ for i in range(len(mat['event_list'])):
             #print(bboxs)
         
         for k, bbox in enumerate(bboxs): # show gound truth
+            b += 1
             #color = (0,0,255) if invalid_labels[k] else (0,255,0)
             color = (0,255,0)
             pt1 = tuple(bbox[:2])
             pt2 = tuple(np.add(bbox[:2], bbox[2:]))
+            #print(pt1, pt2)
             
-            if(((pt2[0]-pt1[0]) >= 20) & ((pt2[0]-pt1[0]) <= 100)):
+            if(((pt2[0]-pt1[0]) >= 16) & ((pt2[0]-pt1[0]) <= 100)):
                 #print(pt1, pt2)
+                c += 1
                 #cv2.rectangle(img, pt1, pt2, color, 2)
             
                 cropped_image = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
                 #cv2.imshow('crop', cropped_image)
                 #key = cv2.waitKey()
 #                crop_name = "cropped_images_train/img_" + str(c) + ".png"
-                crop_name = "/home/barc/Desktop/subir/datasets/Widerface/cropped_images_train/img_" + str(c) + ".png" #cropped_images_val
-                cv2.imwrite(crop_name, cropped_image)
+                crop_name = "/home/barc/Desktop/subir/datasets/Widerface/cropped_images_val/img_" + str(c) + ".png" #cropped_images_val #cropped_images_train
+                try:
+                	cv2.imwrite(crop_name, cropped_image)
+                except:
+                	print("Error in writing file")
             
 #        imgpred = utils.read_image(filepath, color=True)
 #        bboxes, labels, scores = model.predict([imgpred])
@@ -104,5 +112,5 @@ for i in range(len(mat['event_list'])):
      #   if key == 27: # press Esc to quit
      #       quit()
         #print('next_loop')
-
+print(f, b, c)
 #import pdb; pdb.set_trace()
