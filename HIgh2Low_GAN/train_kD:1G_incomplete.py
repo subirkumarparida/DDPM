@@ -42,7 +42,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    max_epoch = 50
+    max_epoch = 150
     learn_rate = 1e-4
     alpha, beta = 1, 0.05
 
@@ -62,20 +62,41 @@ if __name__ == "__main__":
     test_loader = get_loader("widerfacetest", bs=1)
     num_test = 5
     test_save = "intermid_results"
+    k = 5
 
     for ep in range(1, max_epoch+1):
         G_h2l.train()
         D_h2l.train()
         G_l2h.train()
         D_l2h.train()
-        for i, batch in enumerate(loader):
-            optim_D_h2l.zero_grad()
-            optim_D_l2h.zero_grad()
+        for _k in range(k):
+            for i, batch in enumerate(loader):
+            	optim_D_h2l.zero_grad()
+            	optim_D_l2h.zero_grad()
+            
+            	zs = batch["z"].to(device)
+            	lrs = batch["lr"].to(device)
+            	hrs = batch["hr"].to(device)
+            	downs = batch["hr_down"].to(device)
+            
+            	lr_gen = G_h2l(hrs, zs)
+            	lr_gen_detach = lr_gen.detach()
+            	hr_gen = G_l2h(lr_gen_detach)
+            	hr_gen_detach = hr_gen.detach()
+
+            	# update discriminator
+            	loss_D_h2l = nn.ReLU()(1.0 - D_h2l(lrs)).mean() + nn.ReLU()(1 + D_h2l(lr_gen_detach)).mean()
+            	loss_D_l2h = nn.ReLU()(1.0 - D_l2h(hrs)).mean() + nn.ReLU()(1 + D_l2h(hr_gen_detach)).mean()
+            	loss_D_h2l.backward()
+            	loss_D_l2h.backward()
+            	optim_D_h2l.step()
+            	optim_D_l2h.step()
+            
+	for i, batch in enumerate(loader):
             optim_G_h2l.zero_grad()
             optim_G_l2h.zero_grad()
 
             zs = batch["z"].to(device)
-            lrs = batch["lr"].to(device)
             hrs = batch["hr"].to(device)
             downs = batch["hr_down"].to(device)
             
@@ -83,15 +104,7 @@ if __name__ == "__main__":
             lr_gen_detach = lr_gen.detach()
             hr_gen = G_l2h(lr_gen_detach)
             hr_gen_detach = hr_gen.detach()
-
-            # update discriminator
-            loss_D_h2l = nn.ReLU()(1.0 - D_h2l(lrs)).mean() + nn.ReLU()(1 + D_h2l(lr_gen_detach)).mean()
-            loss_D_l2h = nn.ReLU()(1.0 - D_l2h(hrs)).mean() + nn.ReLU()(1 + D_l2h(hr_gen_detach)).mean()
-            loss_D_h2l.backward()
-            loss_D_l2h.backward()
-            optim_D_h2l.step()
-            optim_D_l2h.step()
-
+            
             # update generator
             optim_D_h2l.zero_grad()
             gan_loss_h2l = -D_h2l(lr_gen).mean()

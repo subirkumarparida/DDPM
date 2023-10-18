@@ -16,7 +16,6 @@ High_Data = ["/home/barc/Desktop/subir/datasets/MS1MV2-50K/data"] #"D:/Face/Smal
 Low_Data = ["/home/barc/Desktop/subir/datasets/Widerface/cropped_faces/cropped_images_train"] #"D:/Face/Wider_Face/cropped_images/cropped_images_train"]
 
 
-
 class faces_super(Dataset):
     def __init__(self, datasets, transform):
         assert datasets, print('no datasets specified')
