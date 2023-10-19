@@ -78,7 +78,7 @@ for i in range(len(mat['event_list'])):
             pt2 = tuple(np.add(bbox[:2], bbox[2:]))
             #print(pt1, pt2)
             
-            if(((pt2[0]-pt1[0]) >= 16) & ((pt2[0]-pt1[0]) <= 100)):
+            if(((pt2[0]-pt1[0]) >= 16) & ((pt2[0]-pt1[0]) <= 100) & ((pt2[1]-pt1[1]) >= 16) & ((pt2[1]-pt1[1]) <= 100)):
                 #print(pt1, pt2)
                 c += 1
                 #cv2.rectangle(img, pt1, pt2, color, 2)
