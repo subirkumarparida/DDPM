@@ -49,7 +49,7 @@ def main():
     test_loader = DataLoader(dataset=data, batch_size=opt.batchsize)
     
     net_G_h2l = High2Low().to(device)
-    checkpoint = torch.load("/home/barc/Desktop/subir/Projects/Diffusion-main/HIgh2Low_GAN/intermid_results/models/model_epoch_050.pth")
+    checkpoint = torch.load("/home/barc/Desktop/subir/Projects/Diffusion-main/HIgh2Low_GAN/intermid_results/models/model_epoch_001.pth")
     net_G_h2l.load_state_dict(checkpoint['G_h2l'])    
     net_G_h2l = net_G_h2l.eval()
     
@@ -57,9 +57,12 @@ def main():
     save_path = 'h2l_res'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-
+        
+    c = 0
+    
     #print('======================== EVALUATE ============================')        
     for idx, data_dict in enumerate(test_loader):
+        c += 1
         #print('======================== INSIDE ============================')
         print(idx)
         index = index + 1
@@ -84,9 +87,13 @@ def main():
         np_low_result = (np_low_result - np_low_result.min()) / (np_low_result.max() - np_low_result.min())
         np_low_result = (np_low_result * 255).astype(np.uint8)
         
-        cv2.imwrite("{}/{}_high.png".format(save_path, idx), np_high) 
-        cv2.imwrite("{}/{}_high-down.png".format(save_path, idx), np_high_down)
+        cv2.imwrite("{}/{}_hr.png".format(save_path, idx), np_high) 
+        cv2.imwrite("{}/{}_hr-down.png".format(save_path, idx), np_high_down)
         cv2.imwrite("{}/{}_lr-gen.png".format(save_path, idx), np_low_result)
-
+        
+        if c == 100:
+            print(c)
+            break
+		
 if __name__ == '__main__':
     main()
