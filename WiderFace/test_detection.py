@@ -87,7 +87,8 @@ for i in range(len(mat['event_list'])):
                 #cv2.imshow('crop', cropped_image)
                 #key = cv2.waitKey()
 #                crop_name = "cropped_images_train/img_" + str(c) + ".png"
-                crop_name = "/home/barc/Desktop/subir/datasets/Widerface/cropped_images_val/img_" + str(c) + ".png" #cropped_images_val #cropped_images_train
+                #crop_name = "/home/barc/Desktop/subir/datasets/Widerface/cropped_images_val/img_" + str(c) + ".png" #cropped_images_val #cropped_images_train
+                crop_name = "/home/barc/Desktop/subir/datasets/Widerface/cropped_images_val/" + filename + "_" + str(c) + ".png" #cropped_images_val #cropped_images_train
                 try:
                 	cv2.imwrite(crop_name, cropped_image)
                 except:
