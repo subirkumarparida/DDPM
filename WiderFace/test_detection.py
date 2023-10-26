@@ -12,14 +12,14 @@ import argparse
 
 # dataset paths
 #WIDER_VAL_DIR = 'D:/Face/Wider_Face/WIDER_train/WIDER_train'
-#WIDER_VAL_DIR = 'D:/Face/Wider_Face/WIDER_val'
+WIDER_VAL_DIR = 'D:/Face/Wider_Face/WIDER_val/WIDER_val'
 #WIDER_VAL_DIR = '/home/barc/Desktop/subir/datasets/Widerface/WIDER_train/WIDER_train'
-WIDER_VAL_DIR = '/home/barc/Desktop/subir/datasets/Widerface/WIDER_val/WIDER_val'
+#WIDER_VAL_DIR = '/home/barc/Desktop/subir/datasets/Widerface/WIDER_val/WIDER_val'
 
 #WIDER_VAL_ANNOTATION_MAT = 'D:/Face/Wider_Face/wider_face_split/wider_face_split/wider_face_train.mat'
-#WIDER_VAL_ANNOTATION_MAT = 'D:/Face/Wider_Face/wider_face_split/wider_face_split/wider_face_val.mat'
+WIDER_VAL_ANNOTATION_MAT = 'D:/Face/Wider_Face/wider_face_split/wider_face_split/wider_face_val.mat'
 #WIDER_VAL_ANNOTATION_MAT = '/home/barc/Desktop/subir/datasets/Widerface/wider_face_split/wider_face_split/wider_face_train.mat'
-WIDER_VAL_ANNOTATION_MAT = '/home/barc/Desktop/subir/datasets/Widerface/wider_face_split/wider_face_split/wider_face_val.mat'
+#WIDER_VAL_ANNOTATION_MAT = '/home/barc/Desktop/subir/datasets/Widerface/wider_face_split/wider_face_split/wider_face_val.mat'
 
 # trained model
 #MODELFILE = '/home/barc/Desktop/subir/datasets/Widerface/trained_model/snapshot_model_20180404.npz'
@@ -86,9 +86,9 @@ for i in range(len(mat['event_list'])):
                 cropped_image = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
                 #cv2.imshow('crop', cropped_image)
                 #key = cv2.waitKey()
-#                crop_name = "cropped_images_train/img_" + str(c) + ".png"
                 #crop_name = "/home/barc/Desktop/subir/datasets/Widerface/cropped_images_val/img_" + str(c) + ".png" #cropped_images_val #cropped_images_train
-                crop_name = "/home/barc/Desktop/subir/datasets/Widerface/cropped_images_val/" + filename + "_" + str(c) + ".png" #cropped_images_val #cropped_images_train
+                #crop_name = "/home/barc/Desktop/subir/datasets/Widerface/cropped_images_val/" + filename + "_" + str(c) + ".png" #cropped_images_val #cropped_images_train
+                crop_name = "D:/Face/Wider_Face/cropped_images_val/" + filename + "_" + str(c) + ".png" #cropped_images_val #cropped_images_train
                 try:
                 	cv2.imwrite(crop_name, cropped_image)
                 except:
