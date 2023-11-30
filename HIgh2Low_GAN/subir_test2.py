@@ -2,6 +2,7 @@ import cv2
 import os
 import random
 import pickle
+import _pickle as cPickle
 import argparse
 import numpy as np
 
@@ -26,9 +27,21 @@ def get_default_device():
         return torch.device('cpu')
         
 which_device = get_default_device()
-print(which_device)
+#print(which_device)
 
-file = open("model_yoon.pkl",'rb')
-new_data = pickle.load(file)
-file.close()
-print(new_data)
+# dbfile = open("model.pkl",'rb')
+# db = pickle.load(dbfile, *, fix_import=True, )
+# # for keys in db:
+# #     print(keys, '=>', db[keys])
+# print(dbfile)
+# dbfile.close()
+
+
+# with open(r"model.pkl", "rb") as dbfile:
+#     db = cPickle.load(dbfile)
+
+# print(db)  
+# print(dbfile)
+
+a = torch.load('model.pkl')
+net_G_low2high.load_state_dict(a)
