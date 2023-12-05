@@ -53,6 +53,8 @@ def main():
 
     checkpoint = torch.load("/home/barc/Desktop/subir/Projects/Diffusion-main/HIgh2Low_GAN/intermid_results/models/model_epoch_050.pth")
     net_G_low2high.load_state_dict(checkpoint['G_l2h'])    
+    # checkpoint = torch.load('model.pkl')
+    # net_G_low2high.load_state_dict(checkpoint)    
     net_G_low2high = net_G_low2high.eval()
     index = 0
     test_file = 'test_res'
