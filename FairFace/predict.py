@@ -215,6 +215,11 @@ if __name__ == "__main__":
     ensure_dir(SAVE_DETECTED_AT)
     imgs = pd.read_csv(args.input_csv)['img_path']
     detect_face(imgs, SAVE_DETECTED_AT)
-    print("detected faces are saved at ", SAVE_DETECTED_AT)
+    print("detected faces are saved at /", SAVE_DETECTED_AT)
     #Please change test_outputs.csv to actual name of output csv. 
     predidct_age_gender_race("test_outputs.csv", SAVE_DETECTED_AT)
+    
+    #FETCH_GEN_FACE = "celeba_hq_gen_ddgan"
+    #predidct_age_gender_race("test_outputs_gen.csv", FETCH_GEN_FACE)
+    #FETCH_VAL_FACE = "celeba_hq_val_dataset"
+    #predidct_age_gender_race("test_outputs_data.csv", FETCH_VAL_FACE)
