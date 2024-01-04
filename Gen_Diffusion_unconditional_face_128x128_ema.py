@@ -244,20 +244,18 @@ def save_images(images, path, **kwargs):
 def sample_and_test(args):
     device = args.device
     model = UNet().to(device)
-    #ema_model = UNet().to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-
-    ckpt = torch.load('./models/ckpt.pt', map_location=device)
+    ckpt = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt.pt', map_location=device)
     model.load_state_dict(ckpt)
     model.eval()
 
-    diffusion = Diffusion(img_size=args.image_size, device=device)
-    
+    #ema_model = UNet().to(device)
     #ema = EMA(beta=0.995)
     #ckpt_ema = torch.load('./models/ckpt_ema.pt', map_location=device)
     #ema_model.load_state_dict(ckpt_ema)
     #ema_model.eval()
     
+    diffusion = Diffusion(img_size=args.image_size, device=device)
+
     iters_needed = 3000 // args.batch_size
     save_dir = "./generated_samples/{}".format(args.run_name)
     
@@ -270,7 +268,7 @@ def sample_and_test(args):
     	sampled_images = diffusion.sample(model, n=images.shape[0])
     	#ema_sampled_images = diffusion.sample(ema_model, n=images.shape[0])
     	
-	save_images(sampled_images, os.path.join("test", args.run_name, f"{i}.jpg"))
+    	save_images(sampled_images, os.path.join("test", args.run_name, f"{i}.jpg"))
     	#save_images(ema_sampled_images, os.path.join("test", args.run_name, f"{i}_ema.jpg"))
     
 
@@ -304,7 +302,7 @@ def launch():
     import argparse
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
-    args.run_name = "DDPM_Unconditional_Face_128-CelebA-HQ"
+    args.run_name = "Gen_DDPM_Unconditional_Face_128-CelebA-HQ"
     args.batch_size = 1
     args.image_size = 128
     args.device = "cuda"
