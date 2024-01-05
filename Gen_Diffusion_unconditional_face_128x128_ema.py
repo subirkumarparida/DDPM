@@ -18,7 +18,7 @@ from matplotlib import pyplot as plt
 import logging
 from tqdm import tqdm
 
-
+    
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%M:%S")
 
 
@@ -265,10 +265,11 @@ def sample_and_test(args):
     for i in range(iters_needed):
     	#print("i: ", i)
     	print('generating batch ', i)
-    	sampled_images = diffusion.sample(model, n=images.shape[0])
+    
+        sampled_images = diffusion.sample(model, n=1) #images.shape[0])
     	#ema_sampled_images = diffusion.sample(ema_model, n=images.shape[0])
     	
-    	save_images(sampled_images, os.path.join("test", args.run_name, f"{i}.jpg"))
+        save_images(sampled_images, os.path.join("test", args.run_name, f"{i}.jpg"))
     	#save_images(ema_sampled_images, os.path.join("test", args.run_name, f"{i}_ema.jpg"))
     
 
