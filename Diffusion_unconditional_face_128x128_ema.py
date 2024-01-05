@@ -295,9 +295,10 @@ def train(args):
         ema_sampled_images = diffusion.sample(ema_model, n=images.shape[0])
         save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
         save_images(ema_sampled_images, os.path.join("results", args.run_name, f"{epoch}_ema.jpg"))
-                    
-        torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
-        torch.save(ema_model.state_dict(), os.path.join("models", args.run_name, f"ckpt_ema.pt"))
+        
+        if epoch % args.save_every == 0:
+            torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
+            torch.save(ema_model.state_dict(), os.path.join("models", args.run_name, f"ckpt_ema.pt"))
 
 
 class EMA:
@@ -332,6 +333,7 @@ def launch():
     args = parser.parse_args()
     args.run_name = "DDPM_Unconditional_Face_128-CelebA-HQ"
     args.epochs = 500
+    args.save_every = 2
     args.batch_size = 1
     args.image_size = 128
     args.dataset_path =  r"/home/barc/Desktop/subir/Projects/denoising-diffusion-gan-main/data/celebahq1024_imgs/train" #r"/home/barc/Desktop/subir/datasets/MS1MV2-4K"
