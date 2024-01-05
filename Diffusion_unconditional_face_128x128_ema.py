@@ -4,6 +4,9 @@
 import os
 import copy
 import numpy as np
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '7' #before import torch
+
 import torch
 import torchvision
 import torch.nn as nn
@@ -29,7 +32,7 @@ class Diffusion:
     3 - Sampling images
     '''
     
-    def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=128, device="cuda"):
+    def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=128, device="cuda:0"):
         self.noise_steps = noise_steps
         self.beta_start = beta_start
         self.beta_end = beta_end
@@ -161,7 +164,7 @@ class SelfAttention(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, c_in=3, c_out=3, time_dim=256, device="cuda"):
+    def __init__(self, c_in=3, c_out=3, time_dim=256, device="cuda:0"):
         super().__init__()
         self.device = device
         self.time_dim = time_dim
@@ -336,8 +339,10 @@ def launch():
     args.save_every = 2
     args.batch_size = 1
     args.image_size = 128
-    args.dataset_path =  r"/home/barc/Desktop/subir/Projects/denoising-diffusion-gan-main/data/celebahq1024_imgs/train" #r"/home/barc/Desktop/subir/datasets/MS1MV2-4K"
-    args.device = "cuda"
+    args.dataset_path = r"../DDGAN/data/celebahq256_imgs/train"
+    #r"/home/barc/Desktop/subir/Projects/denoising-diffusion-gan-main/data/celebahq1024_imgs/train" 
+    #r"/home/barc/Desktop/subir/datasets/MS1MV2-4K"
+    args.device = "cuda:0"
     args.lr = 3e-4
     train(args)
 
