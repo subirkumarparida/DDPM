@@ -5,7 +5,8 @@ import os
 import copy
 import numpy as np
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '2' #before import torch
+os.environ['CUDA_VISIBLE_DEVICES'] = '0' #before import torch
+CUDA_LAUNCH_BLOCKING = '1'
 
 import torch
 import torchvision
@@ -20,8 +21,6 @@ from PIL import Image
 from matplotlib import pyplot as plt
 import logging
 from tqdm import tqdm
-
-CUDA_LAUNCH_BLOCKING = '1'
     
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%M:%S")
 
@@ -230,14 +229,6 @@ class UNet(nn.Module):
         return output
 
 
-def plot_images(images):
-    plt.figure(figsize=(32,32))
-    plt.imshow(torch.cat([
-        torch.cat([i for i in images.cpu()], dim=-1)
-    ], dim=-2).permute(1, 2, 0).cpu())
-    plt.show()
-
-
 def save_images(images, path, **kwargs):
     grid = torchvision.utils.make_grid(images, **kwargs)
     ndarr = grid.permute(1,2,0).to("cpu").numpy()
@@ -252,11 +243,11 @@ def sample_and_test(args):
     model.load_state_dict(ckpt)
     model.eval()
 
-    #ema_model = UNet().to(device)
-    #ema = EMA(beta=0.995)
-    #ckpt_ema = torch.load('./models/ckpt_ema.pt', map_location=device)
-    #ema_model.load_state_dict(ckpt_ema)
-    #ema_model.eval()
+    ema_model = UNet().to(device)
+    ema = EMA(beta=0.995)
+    ckpt_ema = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt_ema.pt', map_location=device)
+    ema_model.load_state_dict(ckpt_ema)
+    ema_model.eval()
     
     diffusion = Diffusion(img_size=args.image_size, device=device)
 
@@ -270,11 +261,11 @@ def sample_and_test(args):
     	#print("i: ", i)
     	print('generating batch ', i)
     	
-    	sampled_images = diffusion.sample(model, n=args.batch_size) #images.shape[0])
-    	#ema_sampled_images = diffusion.sample(ema_model, n=images.shape[0])
-    	
+    	sampled_images = diffusion.sample(model, n=args.batch_size)
     	save_images(sampled_images, os.path.join(save_dir, f"{i}.jpg"))
-    	#save_images(ema_sampled_images, os.path.join("test", args.run_name, f"{i}_ema.jpg"))
+    	
+    	ema_sampled_images = diffusion.sample(ema_model, args.batch_size)
+    	save_images(ema_sampled_images, os.path.join(save_dir, f"{i}_ema.jpg"))
     
 
 class EMA:
@@ -307,8 +298,8 @@ def launch():
     import argparse
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
-    args.run_name = "Gen_DDPM_Unconditional_Face_128-CelebA-HQ"
-    args.batch_size = 2
+    args.run_name = "Gen_DDPM_Unconditional_Face_128-CelebA-HQ_0"
+    args.batch_size = 1
     args.image_size = 128
     args.device = "cuda:0"
     sample_and_test(args)
