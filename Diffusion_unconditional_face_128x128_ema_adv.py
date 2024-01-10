@@ -2,11 +2,10 @@
 # coding: utf-8
 
 import os
-#import copy
+import copy
 import numpy as np
 
-#os.environ['CUDA_VISIBLE_DEVICES'] = '0' #before import torch
-#CUDA_LAUNCH_BLOCKING = '1'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '7' #before import torch
 
 import torch
 import torchvision
@@ -21,7 +20,8 @@ from PIL import Image
 from matplotlib import pyplot as plt
 import logging
 from tqdm import tqdm
-    
+
+
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%M:%S")
 
 
@@ -254,6 +254,14 @@ class EMA:
     def reset_parameters(self, ema_model, model):
         ema_model.load_state_dict(model.state_dict())
         
+        
+def plot_images(images):
+    plt.figure(figsize=(32,32))
+    plt.imshow(torch.cat([
+        torch.cat([i for i in images.cpu()], dim=-1)
+    ], dim=-2).permute(1, 2, 0).cpu())
+    plt.show()
+
 
 def save_images(images, path, **kwargs):
     grid = torchvision.utils.make_grid(images, **kwargs)
@@ -262,47 +270,100 @@ def save_images(images, path, **kwargs):
     im.save(path)
 
 
-def sample_and_test(args):
+def get_data(args):
+    transforms = T.Compose([
+        T.Resize(args.image_size),
+        #T.RandomResizedCrop(args.image_size, scale=(0.8, 1.0)),
+        T.ToTensor(),
+        T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    dataset = ImageFolder(args.dataset_path, transform=transforms)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+    return dataloader
+
+
+def setup_logging(run_name):
+    os.makedirs("models", exist_ok=True)
+    os.makedirs("results", exist_ok=True)
+    os.makedirs(os.path.join("models", run_name), exist_ok=True)
+    os.makedirs(os.path.join("results", run_name), exist_ok=True)
+
+
+def train(args):
     device = args.device
-    #model = UNet().to(device)
-    #ckpt = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt.pt', map_location=device)
-    #model.load_state_dict(ckpt)
-    #model.eval()
-
-    ema_model = UNet().to(device)
-    ema = EMA(beta=0.995)
-    ckpt_ema = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt_ema.pt', map_location=device)
-    ema_model.load_state_dict(ckpt_ema)
-    ema_model.eval()
-    
+    dataloader = get_data(args)
+    model = UNet().to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    mse = nn.MSELoss()
     diffusion = Diffusion(img_size=args.image_size, device=device)
-
-    iters_needed = 3000 // args.batch_size
-    save_dir = "./generated_samples/{}".format(args.run_name)
+    l = len(dataloader)
+    ema = EMA(beta=0.995)
     
-    if not os.path.exists(save_dir):
-    	os.makedirs(save_dir)
+    if args.resume:
+        #checkpoint_file = os.path.join(exp_path, 'saved_pth/content.pth')
+        #checkpoint = torch.load(checkpoint_file, map_location=device)
+        
+        ckpt = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt.pt', map_location=device)
+        model.load_state_dict(ckpt)
+        
+        ema_model = UNet().to(device)
+        ckpt_ema = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt_ema.pt', map_location=device)
+        ema_model.load_state_dict(ckpt_ema)
+        
+        init_epoch = args.init_epoch
+        print("=> loaded checkpoint (epoch {})"
+                  .format(init_epoch)
+    else:
+        setup_logging(args.run_name)
+        logger = SummaryWriter(os.path.join("runs", args.run_name))
+        ema_model = copy.deepcopy(model).eval().requires_grad_(False)
+        init_epoch = 0
     
-    for i in range(iters_needed):
-    	#print("i: ", i)
-    	print('generating batch ', i)
-    	
-    	#sampled_images = diffusion.sample(model, n=args.batch_size)
-    	#save_images(sampled_images, os.path.join(save_dir, f"{i}.jpg"))
-    	
-    	ema_sampled_images = diffusion.sample(ema_model, args.batch_size)
-    	save_images(ema_sampled_images, os.path.join(save_dir, f"{i}_ema.jpg"))
+    for epoch in range(init_epoch, args.epochs+1):
+        logging.info(f"Starting epoch {epoch}:")
+        pbar = tqdm(dataloader)
+        for i, (images, _) in enumerate(pbar):
+            images = images.to(device)
+            t = diffusion.sample_timesteps(images.shape[0]).to(device)
+            x_t, noise = diffusion.noise_images(images, t)
+            predicted_noise = model(x_t, t)
+            loss = mse(noise, predicted_noise)
+            
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            ema.step_ema(ema_model, model)
+            
+            pbar.set_postfix(MSE=loss.item())
+            logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
+        
+        sampled_images = diffusion.sample(model, n=images.shape[0])
+        ema_sampled_images = diffusion.sample(ema_model, n=images.shape[0])
+        save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
+        save_images(ema_sampled_images, os.path.join("results", args.run_name, f"{epoch}_ema.jpg"))
+        
+        if epoch % args.save_every == 0:
+            torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
+            torch.save(ema_model.state_dict(), os.path.join("models", args.run_name, f"ckpt_ema.pt"))
         
         
 def launch():
     import argparse
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
-    args.run_name = "Gen_DDPM_Unconditional_Face_128-CelebA-HQ_0"
+    args.resume = 'True' #'False'
+    args.init_epoch = 159
+    args.run_name = "DDPM_Unconditional_Face_128-CelebA-HQ"
+    args.epochs = 500
+    args.save_every = 2
     args.batch_size = 1
     args.image_size = 128
+    args.dataset_path =  r"/home/barc/Desktop/subir/Projects/denoising-diffusion-gan-main/data/celebahq1024_imgs/train"
+    #r"../DDGAN/data/celebahq256_imgs/train"
+    #r"/home/barc/Desktop/subir/datasets/MS1MV2-4K"
     args.device = "cuda:0"
-    sample_and_test(args)
+    args.lr = 3e-4
+    train(args)
 
 if __name__ == "__main__":
     launch()
