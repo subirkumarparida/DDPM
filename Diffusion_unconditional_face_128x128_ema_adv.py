@@ -298,27 +298,29 @@ def train(args):
     diffusion = Diffusion(img_size=args.image_size, device=device)
     l = len(dataloader)
     ema = EMA(beta=0.995)
+
+    logger = SummaryWriter(os.path.join("runs", args.run_name))
     
     if args.resume:
-        #checkpoint_file = os.path.join(exp_path, 'saved_pth/content.pth')
-        #checkpoint = torch.load(checkpoint_file, map_location=device)
-        
-        ckpt = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt.pt', map_location=device)
+        ckpt_file = os.path.join('./models/', args.run_name, 'ckpt.pt')
+        ckpt = torch.load(ckpt_file, map_location=device)
         model.load_state_dict(ckpt)
         
         ema_model = UNet().to(device)
-        ckpt_ema = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt_ema.pt', map_location=device)
+        ckpt_file_ema = os.path.join('./models/', args.run_name, 'ckpt_ema.pt')
+        ckpt_ema = torch.load(ckpt_file_ema, map_location=device)
         ema_model.load_state_dict(ckpt_ema)
         
         init_epoch = args.init_epoch
         print("=> loaded checkpoint (epoch {})"
-                  .format(init_epoch)
-    else:
+                  .format(init_epoch))
+                  
+    else :
         setup_logging(args.run_name)
-        logger = SummaryWriter(os.path.join("runs", args.run_name))
         ema_model = copy.deepcopy(model).eval().requires_grad_(False)
         init_epoch = 0
     
+
     for epoch in range(init_epoch, args.epochs+1):
         logging.info(f"Starting epoch {epoch}:")
         pbar = tqdm(dataloader)
