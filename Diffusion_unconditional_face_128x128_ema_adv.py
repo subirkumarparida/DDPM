@@ -340,13 +340,13 @@ def train(args):
             logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
         
         sampled_images = diffusion.sample(model, n=images.shape[0])
-        ema_sampled_images = diffusion.sample(ema_model, n=images.shape[0])
         save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
+        ema_sampled_images = diffusion.sample(ema_model, n=images.shape[0])
         save_images(ema_sampled_images, os.path.join("results", args.run_name, f"{epoch}_ema.jpg"))
         
         if epoch % args.save_every == 0:
-            torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
-            torch.save(ema_model.state_dict(), os.path.join("models", args.run_name, f"ckpt_ema.pt"))
+            torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt_{epoch}.pt"))
+            torch.save(ema_model.state_dict(), os.path.join("models", args.run_name, f"ckpt_ema_{epoch}.pt"))
         
         
 def launch():
