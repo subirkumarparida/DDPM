@@ -67,13 +67,13 @@ class Diffusion:
                 else:
                     noise = torch.zeros_like(x)
                 x = 1 / torch.sqrt(alpha) * (x - ((1 - alpha)/(torch.sqrt(1 - alpha_hat))) * predicted_noise) + torch.sqrt(beta) * noise
-                x = (x.clamp(-1, 1) + 1) / 2
-                x = (x * 255).type(torch.uint8)
-                save_images(x, os.path.join(iter_dir, f"{it}_{i}.jpg"))
+                temp = (x.clamp(-1, 1) + 1) / 2
+                temp = (temp * 255).type(torch.uint8)
+                save_images(temp, os.path.join(iter_dir, f"{it}_{i}.jpg"))
         
         model.train()
-        #x = (x.clamp(-1, 1) + 1) / 2
-        #x = (x * 255).type(torch.uint8)
+        x = (x.clamp(-1, 1) + 1) / 2
+        x = (x * 255).type(torch.uint8)
         return x
 
 
@@ -286,7 +286,7 @@ def sample_and_test(args):
     	#print("i: ", i)
     	print('generating batch ', i)
     	
-    	iter_dir = os.path.join(save_dir, i)
+    	iter_dir = save_dir + "/" + str(i) #os.path.join(save_dir, i)
     	if not os.path.exists(iter_dir):
     	    os.makedirs(iter_dir)
     	
