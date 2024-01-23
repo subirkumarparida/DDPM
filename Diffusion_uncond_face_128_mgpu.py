@@ -40,7 +40,7 @@ class Diffusion:
     3 - Sampling images
     '''
     
-    def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=128, device="cuda:0"):
+    def __init__(self, device, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=128):
         self.noise_steps = noise_steps
         self.beta_start = beta_start
         self.beta_end = beta_end
@@ -172,7 +172,7 @@ class SelfAttention(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, c_in=3, c_out=3, time_dim=256, device="cuda:0"):
+    def __init__(self, device, c_in=3, c_out=3, time_dim=256):
         super().__init__()
         self.device = device
         self.time_dim = time_dim
@@ -319,7 +319,7 @@ def train(rank, gpu, args):
                                                sampler=train_sampler,
                                                drop_last = True)
                                                                     
-    model = UNet().to(device)
+    model = UNet(device=device).to(device)
     broadcast_params(model.parameters())
     model = nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
     
@@ -337,7 +337,7 @@ def train(rank, gpu, args):
         ckpt = torch.load(ckpt_file, map_location=device)
         model.load_state_dict(ckpt)
         
-        ema_model = UNet().to(device)
+        ema_model = UNet(device=device).to(device)
         broadcast_params(ema_model.parameters())
         ema_model = nn.parallel.DistributedDataParallel(ema_model, device_ids=[gpu])
         
@@ -357,9 +357,9 @@ def train(rank, gpu, args):
 
     for epoch in range(init_epoch, args.epochs+1):
         train_sampler.set_epoch(epoch)
-        logging.info(f"Starting epoch {epoch}:")
-        pbar = tqdm(dataloader)
-        for i, (images, _) in enumerate(pbar):
+        #logging.info(f"Starting epoch {epoch}:")
+        #pbar = tqdm(dataloader)
+        for i, (images, _) in enumerate(dataloader):
             images = images.to(device, non_blocking=True)
             t = diffusion.sample_timesteps(images.shape[0]).to(device)
             x_t, noise = diffusion.noise_images(images, t)
@@ -371,8 +371,12 @@ def train(rank, gpu, args):
             optimizer.step()
             ema.step_ema(ema_model, model)
             
-            pbar.set_postfix(MSE=loss.item())
-            logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
+            if i % 10000 == 0:
+                if rank == 0:
+                    #pbar.set_postfix(MSE=loss.item())
+                    #logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
+                    print('epoch {} iteration {}, global_step {}, MSE: {}'.format(epoch, i, epoch*l + i, loss.item()))
+        
         
         if rank == 0:
             sampled_images = diffusion.sample(model, n=images.shape[0])
@@ -382,6 +386,7 @@ def train(rank, gpu, args):
             save_images(ema_sampled_images, os.path.join("results", args.run_name, f"{epoch}_ema.jpg"))
             
             if epoch % args.save_every == 0:
+                print('Saving content ...')
                 torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt_{epoch}.pt"))
                 torch.save(ema_model.state_dict(), os.path.join("models", args.run_name, f"ckpt_ema_{epoch}.pt"))
         
@@ -389,7 +394,7 @@ def train(rank, gpu, args):
 def init_processes(rank, size, fn, args):
     """ Initialize the distributed environment. """
     os.environ['MASTER_ADDR'] = args.master_address
-    os.environ['MASTER_PORT'] = '6020'
+    os.environ['MASTER_PORT'] = '8910'
     torch.cuda.set_device(args.local_rank)
     gpu = args.local_rank
     dist.init_process_group(backend='nccl', init_method='env://', rank=rank, world_size=size)
@@ -404,9 +409,12 @@ def cleanup():
 def launch():
     parser = argparse.ArgumentParser('ddpm parameters')
     
+    parser.add_argument('--seed', type=int, default=1024,
+                        help='seed used for initialization')
+
     parser.add_argument('--num_proc_node', type=int, default=1,
                         help='The number of nodes in multi node env.')
-    parser.add_argument('--num_process_per_node', type=int, default=4,
+    parser.add_argument('--num_process_per_node', type=int, default=2,
                         help='number of gpus')
     parser.add_argument('--node_rank', type=int, default=0,
                         help='The index of node.')
@@ -424,9 +432,9 @@ def launch():
     args.run_name = "DDPM_Uncond_Face_128-Fairface_bal"
     args.epochs = 500
     args.save_every = 2
-    args.batch_size = 1
+    args.batch_size = 3
     args.image_size = 128
-    args.dataset_path = r"../../datasets/balanced_fair_face/train/"
+    args.dataset_path = r"../DDGAN/data/fairface224_imgs/train/"
     #args.device = "cuda:0"
     args.lr = 3e-4
     
@@ -453,4 +461,5 @@ def launch():
     #train(args)
 
 if __name__ == "__main__":
+    torch.multiprocessing.set_start_method('spawn')
     launch()
