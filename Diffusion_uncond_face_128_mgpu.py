@@ -40,7 +40,7 @@ class Diffusion:
     3 - Sampling images
     '''
     
-    def __init__(self, device, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=128):
+    def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=128, device="cuda:0"):
         self.noise_steps = noise_steps
         self.beta_start = beta_start
         self.beta_end = beta_end
@@ -172,7 +172,7 @@ class SelfAttention(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, device, c_in=3, c_out=3, time_dim=256):
+    def __init__(self, c_in=3, c_out=3, time_dim=256, device="cuda:0"):
         super().__init__()
         self.device = device
         self.time_dim = time_dim
@@ -314,12 +314,12 @@ def train(rank, gpu, args):
     dataloader = torch.utils.data.DataLoader(dataset,
                                                batch_size=batch_size,
                                                shuffle=False,
-                                               num_workers=1,
+                                               num_workers=4,
                                                pin_memory=True,
                                                sampler=train_sampler,
                                                drop_last = True)
                                                                     
-    model = UNet(device=device).to(device)
+    model = UNet().to(device)
     broadcast_params(model.parameters())
     model = nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
     
@@ -337,7 +337,7 @@ def train(rank, gpu, args):
         ckpt = torch.load(ckpt_file, map_location=device)
         model.load_state_dict(ckpt)
         
-        ema_model = UNet(device=device).to(device)
+        ema_model = UNet().to(device)
         broadcast_params(ema_model.parameters())
         ema_model = nn.parallel.DistributedDataParallel(ema_model, device_ids=[gpu])
         
@@ -357,8 +357,7 @@ def train(rank, gpu, args):
 
     for epoch in range(init_epoch, args.epochs+1):
         train_sampler.set_epoch(epoch)
-        if rank == 0:
-            logging.info(f"Starting epoch {epoch}:")
+        logging.info(f"Starting epoch {epoch}:")
         pbar = tqdm(dataloader)
         for i, (images, _) in enumerate(pbar):
             images = images.to(device, non_blocking=True)
@@ -372,9 +371,8 @@ def train(rank, gpu, args):
             optimizer.step()
             ema.step_ema(ema_model, model)
             
-            if rank == 0:
-                pbar.set_postfix(MSE=loss.item())
-                logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
+            pbar.set_postfix(MSE=loss.item())
+            logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
         
         if rank == 0:
             sampled_images = diffusion.sample(model, n=images.shape[0])
@@ -416,8 +414,6 @@ def launch():
                         help='rank of process in the node')
     parser.add_argument('--master_address', type=str, default='127.0.0.1',
                         help='address for master')
-    parser.add_argument('--seed', type=int, default=1024,
-                        help='seed used for initialization')
     
     args = parser.parse_args()
     args.world_size = args.num_proc_node * args.num_process_per_node
@@ -441,7 +437,7 @@ def launch():
             global_rank = rank + args.node_rank * args.num_process_per_node
             global_size = args.num_proc_node * args.num_process_per_node
             args.global_rank = global_rank
-            print('Node rank %d, local proc %d, global proc %d \n' % (args.node_rank, rank, global_rank))
+            print('Node rank %d, local proc %d, global proc %d' % (args.node_rank, rank, global_rank))
             p = Process(target=init_processes, args=(global_rank, global_size, train, args))
             p.start()
             processes.append(p)

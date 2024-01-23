@@ -292,7 +292,7 @@ def setup_logging(run_name):
 def train(args):
     device = args.device
     dataloader = get_data(args)
-    model = UNet().to(device)
+    model = UNet(device=device).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     mse = nn.MSELoss()
     diffusion = Diffusion(img_size=args.image_size, device=device)
@@ -302,16 +302,18 @@ def train(args):
     logger = SummaryWriter(os.path.join("runs", args.run_name))
     
     if args.resume:
-        ckpt_file = os.path.join('./models/', args.run_name, 'ckpt.pt')
+        #print(args.resume)
+        init_epoch = args.init_epoch
+        
+        ckpt_file = os.path.join('./models/', args.run_name, f"ckpt_{init_epoch}.pt")
         ckpt = torch.load(ckpt_file, map_location=device)
         model.load_state_dict(ckpt)
         
-        ema_model = UNet().to(device)
-        ckpt_file_ema = os.path.join('./models/', args.run_name, 'ckpt_ema.pt')
+        ema_model = UNet(device=device).to(device)
+        ckpt_file_ema = os.path.join('./models/', args.run_name, f"ckpt_ema_{init_epoch}.pt")
         ckpt_ema = torch.load(ckpt_file_ema, map_location=device)
         ema_model.load_state_dict(ckpt_ema)
         
-        init_epoch = args.init_epoch
         print("=> loaded checkpoint (epoch {})"
                   .format(init_epoch))
                   
@@ -353,14 +355,15 @@ def launch():
     import argparse
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
-    args.resume = 'True' #'False'
-    args.init_epoch = 159
-    args.run_name = "DDPM_Unconditional_Face_128-CelebA-HQ"
+    args.resume = False #True #False
+    args.init_epoch = 0
+    args.run_name = "DDPM_Unconditional_Face_128-Fairface_bal"
     args.epochs = 500
     args.save_every = 2
     args.batch_size = 1
     args.image_size = 128
-    args.dataset_path =  r"/home/barc/Desktop/subir/Projects/denoising-diffusion-gan-main/data/celebahq1024_imgs/train"
+    args.dataset_path = r"/home/barc/Desktop/subir/datasets/balanced_fair_face"
+    #r"/home/barc/Desktop/subir/Projects/denoising-diffusion-gan-main/data/celebahq1024_imgs/train"
     #r"../DDGAN/data/celebahq256_imgs/train"
     #r"/home/barc/Desktop/subir/datasets/MS1MV2-4K"
     args.device = "cuda:0"
