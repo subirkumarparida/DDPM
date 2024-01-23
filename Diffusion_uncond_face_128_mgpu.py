@@ -25,7 +25,7 @@ from torch.multiprocessing import Process
 import torch.distributed as dist
 
 
-logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%M:%S")
+#logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%M:%S")
 
 
 def broadcast_params(params):
@@ -64,7 +64,8 @@ class Diffusion:
         return torch.randint(low=1, high=self.noise_steps, size=(n,))
     
     def sample(self, model, n):
-        logging.info(f"Sampling {n} new images ....")
+        #logging.info(f"Sampling {n} new images ....")
+        print("Sampling {%d} new images ....", n)
         model.eval()
         with torch.no_grad():
             x = torch.randn((n, 3, self.img_size, self.img_size)).to(self.device)
@@ -358,8 +359,8 @@ def train(rank, gpu, args):
     for epoch in range(init_epoch, args.epochs+1):
         train_sampler.set_epoch(epoch)
         #logging.info(f"Starting epoch {epoch}:")
-        #pbar = tqdm(dataloader)
-        for i, (images, _) in enumerate(dataloader):
+        pbar = tqdm(dataloader)
+        for i, (images, _) in enumerate(pbar):
             images = images.to(device, non_blocking=True)
             t = diffusion.sample_timesteps(images.shape[0]).to(device)
             x_t, noise = diffusion.noise_images(images, t)
@@ -371,11 +372,11 @@ def train(rank, gpu, args):
             optimizer.step()
             ema.step_ema(ema_model, model)
             
-            if i % 10000 == 0:
-                if rank == 0:
-                    #pbar.set_postfix(MSE=loss.item())
-                    #logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
-                    print('epoch {} iteration {}, global_step {}, MSE: {}'.format(epoch, i, epoch*l + i, loss.item()))
+            #if i % 100 == 0:
+            if rank == 0:
+                pbar.set_postfix(MSE=loss.item())
+                logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
+                    #print('epoch {} iteration {}, global_step {}, MSE: {}'.format(epoch, i, epoch*l + i, loss.item()))
         
         
         if rank == 0:
