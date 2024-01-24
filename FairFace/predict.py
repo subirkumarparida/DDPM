@@ -23,10 +23,13 @@ def rect_to_bb(rect):
 	# return a tuple of (x, y, w, h)
 	return (x, y, w, h)
 
-def detect_face(image_paths,  SAVE_DETECTED_AT, default_max_size=800,size = 300, padding = 0.25):
+def detect_face(input_images_folder, SAVE_DETECTED_AT, default_max_size=800, size = 300, padding = 0.25):
     cnn_face_detector = dlib.cnn_face_detection_model_v1('dlib_models/mmod_human_face_detector.dat')
     sp = dlib.shape_predictor('dlib_models/shape_predictor_5_face_landmarks.dat')
     base = 2000  # largest width and height
+
+    image_paths = [os.path.join(input_images_folder, x) for x in os.listdir(input_images_folder)]
+
     for index, image_path in enumerate(image_paths):
         if index % 1000 == 0:
             print('---%d/%d---' %(index, len(image_paths)))
@@ -43,7 +46,7 @@ def detect_face(image_paths,  SAVE_DETECTED_AT, default_max_size=800,size = 300,
         dets = cnn_face_detector(img, 1)
         num_faces = len(dets)
         if num_faces == 0:
-            print("Sorry, there were no faces found in '{}'".format(image_path))
+            print("No faces found in '{}'".format(image_path))
             continue
         # Find the 5 face landmarks we need to do the alignment.
         faces = dlib.full_object_detections()
@@ -57,7 +60,7 @@ def detect_face(image_paths,  SAVE_DETECTED_AT, default_max_size=800,size = 300,
             face_name = os.path.join(SAVE_DETECTED_AT,  path_sp[0] + "_" + "face" + str(idx) + "." + path_sp[-1])
             dlib.save_image(image, face_name)
 
-def predidct_age_gender_race(save_prediction_at, imgs_path = 'cropped_faces/'):
+def predidct_age_gender_race(save_prediction_at, imgs_path):
     img_names = [os.path.join(imgs_path, x) for x in os.listdir(imgs_path)]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -201,25 +204,27 @@ def ensure_dir(directory):
         os.makedirs(directory)
 
 
-
 if __name__ == "__main__":
-    #Please create a csv with one column 'img_path', contains the full paths of all images to be analyzed.
-    #Also please change working directory to this file.
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--csv', dest='input_csv', action='store',
-                        help='csv file of image path where col name for image path is "img_path')
+    
     dlib.DLIB_USE_CUDA = True
     print("using CUDA?: %s" % dlib.DLIB_USE_CUDA)
-    args = parser.parse_args()
-    SAVE_DETECTED_AT = "detected_faces"
-    ensure_dir(SAVE_DETECTED_AT)
-    imgs = pd.read_csv(args.input_csv)['img_path']
-    detect_face(imgs, SAVE_DETECTED_AT)
-    print("detected faces are saved at /", SAVE_DETECTED_AT)
-    #Please change test_outputs.csv to actual name of output csv. 
-    predidct_age_gender_race("test_outputs.csv", SAVE_DETECTED_AT)
     
-    #FETCH_GEN_FACE = "celeba_hq_gen_ddgan"
-    #predidct_age_gender_race("test_outputs_gen.csv", FETCH_GEN_FACE)
-    #FETCH_VAL_FACE = "celeba_hq_val_dataset"
-    #predidct_age_gender_race("test_outputs_data.csv", FETCH_VAL_FACE)
+    INPUT_IMAGE_FOLDER = "../DDGAN/generated_samples_fairface_bal_ep=175/fairface_224/"
+    SAVE_DETECTED_AT = "detected_faces_fairface_bal_gen_ddgan_ep=175"
+    ensure_dir(SAVE_DETECTED_AT)
+    OUTPUT_CSV_FILE = "fairface_bal_gen_ddgan_dlib.csv"
+    
+    detect_face(INPUT_IMAGE_FOLDER, SAVE_DETECTED_AT)
+    print("detected faces are saved at /", SAVE_DETECTED_AT)
+    
+    predidct_age_gender_race(OUTPUT_CSV_FILE, SAVE_DETECTED_AT)
+    
+    #"../DDGAN/generated_samples_fairface_bal_ep=161/fairface_224/"
+    #"generated_samples_ep=158/"
+    #"../DDPM/generated_samples_ep=75-ema_fairface/Gen_DDPM_Unconditional_Face_128-CelebA-HQ/"
+    #"../DDGAN/generated_samples_fairface_ep=110/fairface_224/"
+    #"../DDGAN/generated_samples_celeba_ep=550/celeba_256/"
+    #"celeba_hq_gen_sd"
+    #"celeba_hq_gen_ddgan"
+    #"../data_fairface/train"
+    #"../DDGAN/data/celebahq256_imgs/train/train"
