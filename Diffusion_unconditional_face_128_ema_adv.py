@@ -307,11 +307,17 @@ def train(args):
         
         ckpt_file = os.path.join('./models/', args.run_name, f"ckpt_{init_epoch}.pt")
         ckpt = torch.load(ckpt_file, map_location=device)
+        #loading weights from ddp in single gpu
+        for key in list(ckpt.keys()):
+            ckpt[key[7:]] = ckpt.pop(key)
         model.load_state_dict(ckpt)
         
         ema_model = UNet(device=device).to(device)
         ckpt_file_ema = os.path.join('./models/', args.run_name, f"ckpt_ema_{init_epoch}.pt")
         ckpt_ema = torch.load(ckpt_file_ema, map_location=device)
+        #loading weights from ddp in single gpu
+        for key in list(ckpt_ema.keys()):
+            ckpt_ema[key[7:]] = ckpt_ema.pop(key)
         ema_model.load_state_dict(ckpt_ema)
         
         print("=> loaded checkpoint (epoch {})"
@@ -359,7 +365,7 @@ def launch():
     args.init_epoch = 0
     args.run_name = "DDPM_Unconditional_Face_128-Fairface_bal"
     args.epochs = 500
-    args.save_every = 2
+    args.save_every = 1
     args.batch_size = 1
     args.image_size = 128
     args.dataset_path = r"/home/barc/Desktop/subir/datasets/balanced_fair_face"
