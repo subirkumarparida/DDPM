@@ -2,7 +2,6 @@
 # coding: utf-8
 
 import os
-#import copy
 import numpy as np
 
 #os.environ['CUDA_VISIBLE_DEVICES'] = '0' #before import torch
@@ -15,7 +14,7 @@ import torch.nn.functional as F
 from torchvision import transforms as T
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -56,11 +55,11 @@ class Diffusion:
         return torch.randint(low=1, high=self.noise_steps, size=(n,))
     
     def sample(self, model, n):
-        logging.info(f"Sampling {n} new images ....")
+        #logging.info(f"Sampling {n} new images .... \n")
         model.eval()
         with torch.no_grad():
             x = torch.randn((n, 3, self.img_size, self.img_size)).to(self.device)
-            for i in tqdm(reversed(range(1, self.noise_steps)), position=0):
+            for i in reversed(range(1, self.noise_steps)):
                 t = (torch.ones(n) * i).long().to(self.device)
                 predicted_noise = model(x, t)
                 alpha = self.alpha[t][:, None, None, None]
@@ -264,41 +263,41 @@ def save_images(images, path, **kwargs):
 
 def sample_and_test(args):
     device = args.device
-    #model = UNet().to(device)
-    #ckpt = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt.pt', map_location=device)
-    #model.load_state_dict(ckpt)
-    #model.eval()
+    model = UNet().to(device)
+    ckpt = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt.pt', map_location=device)
+    model.load_state_dict(ckpt)
+    model.eval()
 
-    ema_model = UNet().to(device)
-    ema = EMA(beta=0.995)
-    ckpt_ema = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt_ema.pt', map_location=device)
-    ema_model.load_state_dict(ckpt_ema)
-    ema_model.eval()
+    #ema_model = UNet().to(device)
+    #ema = EMA(beta=0.995)
+    #ckpt_ema = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt_ema.pt', map_location=device)
+    #ema_model.load_state_dict(ckpt_ema)
+    #ema_model.eval()
     
     diffusion = Diffusion(img_size=args.image_size, device=device)
 
-    iters_needed = 3000 // args.batch_size
+    iters_needed = 5000 // args.batch_size
     save_dir = "./generated_samples/{}".format(args.run_name)
     
     if not os.path.exists(save_dir):
     	os.makedirs(save_dir)
     
     for i in range(iters_needed):
-    	#print("i: ", i)
-    	print('generating batch ', i)
+        logging.info(f"generating batch {i} \n")
+    	#print('generating batch ', i)
+        
+        sampled_images = diffusion.sample(model, n=args.batch_size)
+        save_images(sampled_images, os.path.join(save_dir, f"{i}.jpg"))
     	
-    	#sampled_images = diffusion.sample(model, n=args.batch_size)
-    	#save_images(sampled_images, os.path.join(save_dir, f"{i}.jpg"))
-    	
-    	ema_sampled_images = diffusion.sample(ema_model, args.batch_size)
-    	save_images(ema_sampled_images, os.path.join(save_dir, f"{i}_ema.jpg"))
+    	#ema_sampled_images = diffusion.sample(ema_model, args.batch_size)
+    	#save_images(ema_sampled_images, os.path.join(save_dir, f"{i}_ema.jpg"))
         
         
 def launch():
     import argparse
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
-    args.run_name = "Gen_DDPM_Unconditional_Face_128-CelebA-HQ_0"
+    args.run_name = "DDPM_CelebA_ep-256"
     args.batch_size = 1
     args.image_size = 128
     args.device = "cuda:0"

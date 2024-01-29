@@ -2,11 +2,10 @@
 # coding: utf-8
 
 import os
-import copy
 import numpy as np
-import argparse
 
-#os.environ['CUDA_VISIBLE_DEVICES'] = '7' #before import torch
+#os.environ['CUDA_VISIBLE_DEVICES'] = '0' #before import torch
+#CUDA_LAUNCH_BLOCKING = '1'
 
 import torch
 import torchvision
@@ -15,24 +14,16 @@ import torch.nn.functional as F
 from torchvision import transforms as T
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 
 from PIL import Image
 from matplotlib import pyplot as plt
 import logging
 from tqdm import tqdm
-from torch.multiprocessing import Process
-import torch.distributed as dist
+    
+logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%M:%S")
 
 
-#logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%M:%S")
-
-
-def broadcast_params(params):
-    for param in params:
-        dist.broadcast(param.data, src=0)
-        
-        
 class Diffusion:
     '''
     1 - Setting up a noising schedule
@@ -40,7 +31,7 @@ class Diffusion:
     3 - Sampling images
     '''
     
-    def __init__(self, device, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=128):
+    def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=128, device="cuda"):
         self.noise_steps = noise_steps
         self.beta_start = beta_start
         self.beta_end = beta_end
@@ -64,12 +55,11 @@ class Diffusion:
         return torch.randint(low=1, high=self.noise_steps, size=(n,))
     
     def sample(self, model, n):
-        #logging.info(f"Sampling {n} new images ....")
-        print('Sampling %d new images ....' %(n))
+        #logging.info(f"Sampling {n} new images .... \n")
         model.eval()
         with torch.no_grad():
             x = torch.randn((n, 3, self.img_size, self.img_size)).to(self.device)
-            for i in tqdm(reversed(range(1, self.noise_steps)), position=0):
+            for i in reversed(range(1, self.noise_steps)):
                 t = (torch.ones(n) * i).long().to(self.device)
                 predicted_noise = model(x, t)
                 alpha = self.alpha[t][:, None, None, None]
@@ -173,7 +163,7 @@ class SelfAttention(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, device, c_in=3, c_out=3, time_dim=256):
+    def __init__(self, c_in=3, c_out=3, time_dim=256, device="cuda"):
         super().__init__()
         self.device = device
         self.time_dim = time_dim
@@ -263,14 +253,6 @@ class EMA:
     def reset_parameters(self, ema_model, model):
         ema_model.load_state_dict(model.state_dict())
         
-        
-def plot_images(images):
-    plt.figure(figsize=(32,32))
-    plt.imshow(torch.cat([
-        torch.cat([i for i in images.cpu()], dim=-1)
-    ], dim=-2).permute(1, 2, 0).cpu())
-    plt.show()
-
 
 def save_images(images, path, **kwargs):
     grid = torchvision.utils.make_grid(images, **kwargs)
@@ -279,190 +261,47 @@ def save_images(images, path, **kwargs):
     im.save(path)
 
 
-def get_data(args):
-    transforms = T.Compose([
-        T.Resize(args.image_size),
-        #T.RandomResizedCrop(args.image_size, scale=(0.8, 1.0)),
-        T.ToTensor(),
-        T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
-    dataset = ImageFolder(args.dataset_path, transform=transforms)
-    #dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-    return dataset
+def sample_and_test(args):
+    device = args.device
+    #model = UNet().to(device)
+    #ckpt = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt.pt', map_location=device)
+    #model.load_state_dict(ckpt)
+    #model.eval()
 
-
-def setup_logging(run_name):
-    os.makedirs("models", exist_ok=True)
-    os.makedirs("results", exist_ok=True)
-    os.makedirs(os.path.join("models", run_name), exist_ok=True)
-    os.makedirs(os.path.join("results", run_name), exist_ok=True)
-
-
-def train(rank, gpu, args):
-    #device = args.device
-    
-    torch.manual_seed(args.seed + rank)
-    torch.cuda.manual_seed(args.seed + rank)
-    torch.cuda.manual_seed_all(args.seed + rank)
-    device = torch.device('cuda:{}'.format(gpu))
-    
-    batch_size = args.batch_size
-    
-    dataset = get_data(args)
-    train_sampler = torch.utils.data.distributed.DistributedSampler(dataset,
-                                                                    num_replicas=args.world_size,
-                                                                    rank=rank)
-    dataloader = torch.utils.data.DataLoader(dataset,
-                                               batch_size=batch_size,
-                                               shuffle=False,
-                                               num_workers=4,
-                                               pin_memory=True,
-                                               sampler=train_sampler,
-                                               drop_last = True)
-                                                                    
-    model = UNet(device=device).to(device)
-    broadcast_params(model.parameters())
-    model = nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
-    
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-    mse = nn.MSELoss()
-    diffusion = Diffusion(img_size=args.image_size, device=device)
-    l = len(dataloader)
+    ema_model = UNet().to(device)
     ema = EMA(beta=0.995)
-
-    logger = SummaryWriter(os.path.join("runs", args.run_name))
+    ckpt_ema = torch.load('./models/DDPM_Unconditional_Face_128-CelebA-HQ/ckpt_ema.pt', map_location=device)
+    ema_model.load_state_dict(ckpt_ema)
+    ema_model.eval()
     
-    if args.resume:
-        #print(args.resume)
-        init_epoch = args.init_epoch
+    diffusion = Diffusion(img_size=args.image_size, device=device)
 
-        ckpt_file = os.path.join('./models/', args.run_name, f"ckpt_{init_epoch}.pt")
-        ckpt = torch.load(ckpt_file, map_location=device)
-        model.load_state_dict(ckpt)
-        
-        ema_model = UNet(device=device).to(device)
-        broadcast_params(ema_model.parameters())
-        ema_model = nn.parallel.DistributedDataParallel(ema_model, device_ids=[gpu])
-        
-        ckpt_file_ema = os.path.join('./models/', args.run_name, f"ckpt_ema_{init_epoch}.pt")
-        ckpt_ema = torch.load(ckpt_file_ema, map_location=device)
-        ema_model.load_state_dict(ckpt_ema)
-        
-        print("=> loaded checkpoint (epoch {})"
-                  .format(init_epoch))
-                  
-    else :
-        setup_logging(args.run_name)
-        ema_model = copy.deepcopy(model).eval().requires_grad_(False)
-        init_epoch = 0
+    iters_needed = 5000 // args.batch_size
+    save_dir = "./generated_samples/{}".format(args.run_name)
     
-
-    for epoch in range(init_epoch, args.epochs+1):
-        train_sampler.set_epoch(epoch)
-        #logging.info(f"Starting epoch {epoch}:")
-        pbar = tqdm(dataloader)
-        for i, (images, _) in enumerate(pbar):
-            images = images.to(device, non_blocking=True)
-            t = diffusion.sample_timesteps(images.shape[0]).to(device)
-            x_t, noise = diffusion.noise_images(images, t)
-            predicted_noise = model(x_t, t)
-            loss = mse(noise, predicted_noise)
-            
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            ema.step_ema(ema_model, model)
-            
-            #if i % 100 == 0:
-            if rank == 0:
-                pbar.set_postfix(MSE=loss.item())
-                logger.add_scalar("MSE", loss.item(), global_step=epoch*l + i)
-                    #print('epoch {} iteration {}, global_step {}, MSE: {}'.format(epoch, i, epoch*l + i, loss.item()))
-        
-        
-        if rank == 0:
-            sampled_images = diffusion.sample(model, n=2) #images.shape[0])
-            save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
-            
-            ema_sampled_images = diffusion.sample(ema_model, n=2) #images.shape[0])
-            save_images(ema_sampled_images, os.path.join("results", args.run_name, f"{epoch}_ema.jpg"))
-            
-            if epoch % args.save_every == 0:
-                print('Saving content ...')
-                torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt_{epoch}.pt"))
-                torch.save(ema_model.state_dict(), os.path.join("models", args.run_name, f"ckpt_ema_{epoch}.pt"))
-        
-
-def init_processes(rank, size, fn, args):
-    """ Initialize the distributed environment. """
-    os.environ['MASTER_ADDR'] = args.master_address
-    os.environ['MASTER_PORT'] = '8910'
-    torch.cuda.set_device(args.local_rank)
-    gpu = args.local_rank
-    dist.init_process_group(backend='nccl', init_method='env://', rank=rank, world_size=size)
-    fn(rank, gpu, args)
-    dist.barrier()
-    cleanup()  
-
-def cleanup():
-    dist.destroy_process_group()
+    if not os.path.exists(save_dir):
+    	os.makedirs(save_dir)
     
-            
+    for i in range(iters_needed):
+        logging.info(f"generating batch {i} \n")
+    	#print('generating batch ', i)
+    	
+    	#sampled_images = diffusion.sample(model, n=args.batch_size)
+    	#save_images(sampled_images, os.path.join(save_dir, f"{i}.jpg"))
+    	
+    	ema_sampled_images = diffusion.sample(ema_model, args.batch_size)
+    	save_images(ema_sampled_images, os.path.join(save_dir, f"{i}_ema.jpg"))
+        
+        
 def launch():
-    parser = argparse.ArgumentParser('ddpm parameters')
-    
-    parser.add_argument('--seed', type=int, default=1024,
-                        help='seed used for initialization')
-
-    parser.add_argument('--num_proc_node', type=int, default=1,
-                        help='The number of nodes in multi node env.')
-    parser.add_argument('--num_process_per_node', type=int, default=3,
-                        help='number of gpus')
-    parser.add_argument('--node_rank', type=int, default=0,
-                        help='The index of node.')
-    parser.add_argument('--local_rank', type=int, default=0,
-                        help='rank of process in the node')
-    parser.add_argument('--master_address', type=str, default='127.0.0.1',
-                        help='address for master')
-    
+    import argparse
+    parser = argparse.ArgumentParser()
     args = parser.parse_args()
-    args.world_size = args.num_proc_node * args.num_process_per_node
-    size = args.num_process_per_node
-                
-    args.resume = True #True #False
-    args.init_epoch = 86
-    args.run_name = "DDPM_Uncond_Face_128-Fairface_bal"
-    args.epochs = 500
-    args.save_every = 2
-    args.batch_size = 3
+    args.run_name = "DDPM_CelebA_ep-256_ema"
+    args.batch_size = 1
     args.image_size = 128
-    args.dataset_path = r"../../datasets/balanced_fair_face/train/"
-    #r"../DDGAN/data/fairface224_imgs/train/"
-    #args.device = "cuda:0"
-    args.lr = 3e-4
-    
-    if size > 1:
-        processes = []
-        for rank in range(size):
-            args.local_rank = rank
-            global_rank = rank + args.node_rank * args.num_process_per_node
-            global_size = args.num_proc_node * args.num_process_per_node
-            args.global_rank = global_rank
-            print('Node rank %d, local proc %d, global proc %d' % (args.node_rank, rank, global_rank))
-            p = Process(target=init_processes, args=(global_rank, global_size, train, args))
-            p.start()
-            processes.append(p)
-            
-        for p in processes:
-            p.join()
-    else:
-        print('starting in debug mode')
-        
-        init_processes(0, size, train, args)
-        
-    
-    #train(args)
+    args.device = "cuda"
+    sample_and_test(args)
 
 if __name__ == "__main__":
-    torch.multiprocessing.set_start_method('spawn')
     launch()
